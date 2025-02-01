@@ -24,21 +24,26 @@ export const resolvers = {
         description?: string;
       }
     ) => {
-      const createdRequest = await prisma.maintenanceRequest.create({
-        data: {
-          title,
-          urgency,
-          status: status || "OPEN",
-          description,
-          createdAt: new Date(),
-        },
-      });
+      try {
+        const createdRequest = await prisma.maintenanceRequest.create({
+          data: {
+            title,
+            urgency,
+            status: status || "OPEN",
+            description,
+            createdAt: new Date(),
+          },
+        });
 
-      await pubsub.publish("REQUEST_UPDATED", {
-        requestUpdated: createdRequest,
-      });
+        await pubsub.publish("REQUEST_UPDATED", {
+          requestUpdated: createdRequest,
+        });
 
-      return createdRequest;
+        return createdRequest;
+      } catch (error) {
+        console.debug("ERROR CREATING REQUEST", error);
+        throw error;
+      }
     },
     resolveRequest: async (_: any, { id }: { id: number }) => {
       const currentRequest = await prisma.maintenanceRequest.findUnique({
@@ -52,20 +57,27 @@ export const resolvers = {
       const timeToResolve = Math.floor(
         (new Date().getTime() - currentRequest.createdAt.getTime()) / 1000
       );
-      const updatedRequest = await prisma.maintenanceRequest.update({
-        where: { id },
-        data: {
-          status: "RESOLVED",
-          resolvedAt: new Date(),
-          timeToResolve: Math.round((timeToResolve / (60 * 60 * 24)) * 10) / 10, // calculate to a day,
-        },
-      });
 
-      await pubsub.publish("REQUEST_UPDATED", {
-        requestUpdated: updatedRequest,
-      });
+      try {
+        const updatedRequest = await prisma.maintenanceRequest.update({
+          where: { id },
+          data: {
+            status: "RESOLVED",
+            resolvedAt: new Date(),
+            timeToResolve:
+              Math.round((timeToResolve / (60 * 60 * 24)) * 10) / 10, // calculate to a day,
+          },
+        });
 
-      return updatedRequest;
+        await pubsub.publish("REQUEST_UPDATED", {
+          requestUpdated: updatedRequest,
+        });
+
+        return updatedRequest;
+      } catch (error) {
+        console.debug("ERROR RESOLVING REQUEST", error);
+        throw error;
+      }
     },
   },
   Subscription: {
